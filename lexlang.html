@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LexLang — Intérprete</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0f0f10;
+      --bg2: #17171a;
+      --bg3: #1e1e23;
+      --border: rgba(255, 255, 255, 0.08);
+      --border2: rgba(255, 255, 255, 0.14);
+      --text: #e8e6df;
+      --muted: #888580;
+      --accent: #c8f04a;
+      --accent2: #4af0c8;
+      --accent3: #f04a8a;
+      --accent4: #f0a84a;
+      --accent5: #8a4af0;
+      --accent6: #4a9ff0;
+      --font-mono: 'JetBrains Mono', monospace;
+      --font-display: 'Syne', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-display);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 1.5rem 2rem 1.2rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--accent);
+    }
+
+    header p {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .tag {
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .t-kw {
+      background: rgba(200, 240, 74, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(200, 240, 74, 0.25);
+    }
+
+    .t-str {
+      background: rgba(74, 240, 200, 0.12);
+      color: var(--accent2);
+      border: 1px solid rgba(74, 240, 200, 0.25);
+    }
+
+    .t-num {
+      background: rgba(240, 168, 74, 0.12);
+      color: var(--accent4);
+      border: 1px solid rgba(240, 168, 74, 0.25);
+    }
+
+    .t-fn {
+      background: rgba(138, 74, 240, 0.12);
+      color: var(--accent5);
+      border: 1px solid rgba(138, 74, 240, 0.25);
+    }
+
+    .t-err {
+      background: rgba(240, 74, 138, 0.12);
+      color: var(--accent3);
+      border: 1px solid rgba(240, 74, 138, 0.25);
+    }
+
+    .t-ok {
+      background: rgba(74, 159, 240, 0.12);
+      color: var(--accent6);
+      border: 1px solid rgba(74, 159, 240, 0.25);
+    }
+
+    .tags-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr auto;
+      gap: 0;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .editor-pane,
+    .output-pane {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      min-height: 0;
+    }
+
+    .output-pane {
+      border-right: none;
+    }
+
+    /* === Panel de análisis full-width === */
+    .analysis-section {
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+      display: none;     /* oculto hasta que se ejecute */
+    }
+
+    .analysis-section.visible {
+      display: block;
+    }
+
+    .analysis-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .analysis-tab {
+      padding: 10px 20px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      user-select: none;
+    }
+
+    .analysis-tab:hover { color: var(--text); }
+
+    .analysis-tab.active {
+      color: var(--accent4);
+      border-bottom-color: var(--accent4);
+    }
+
+    .analysis-panel {
+      display: none;
+      padding: 1.2rem 1.5rem;
+    }
+
+    .analysis-panel.active { display: block; }
+
+    /* Token table */
+    .token-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .token-table th {
+      text-align: left;
+      padding: 6px 12px;
+      border-bottom: 2px solid var(--border2);
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+
+    .token-table td {
+      padding: 5px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .token-table tr:hover td { background: var(--bg3); }
+
+    .tok-type { color: var(--accent4); font-weight: 600; }
+    .tok-val  { color: var(--accent2); }
+    .tok-line { color: var(--muted); }
+
+    /* AST container */
+    #tree-svg-container {
+      background: #fff;
+      border-radius: 8px;
+      overflow: auto;
+      border: 1px solid var(--border2);
+    }
+
+    .pane-header {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      color: var(--muted);
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .pane-header span.dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    textarea#code {
+      flex: 1;
+      background: var(--bg2);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      line-height: 1.75;
+      border: none;
+      outline: none;
+      resize: none;
+      padding: 16px 18px;
+      tab-size: 2;
+      min-height: 420px;
+    }
+
+    textarea#code::placeholder {
+      color: #444;
+    }
+
+    #output {
+      flex: 1;
+      background: var(--bg2);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.8;
+      overflow-y: auto;
+      padding: 14px 18px;
+      min-height: 420px;
+    }
+
+    .out-line {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 3px;
+      animation: fadeIn 0.15s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(2px);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    .out-op {
+      flex-shrink: 0;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 3px;
+      letter-spacing: 0.5px;
+      width: 100px;
+      text-align: center;
+    }
+
+    .out-line-num {
+      color: #444;
+      font-size: 11px;
+      width: 24px;
+      text-align: right;
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    .out-val {
+      color: var(--text);
+      word-break: break-all;
+    }
+
+    .out-val.is-num {
+      color: var(--accent4);
+    }
+
+    .out-val.is-str {
+      color: var(--accent2);
+    }
+
+    .out-val.is-bool {
+      color: var(--accent);
+    }
+
+    .out-val.is-err {
+      color: var(--accent3);
+    }
+
+    .out-val.is-info {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .out-sep {
+      color: #333;
+      margin: 0 4px;
+    }
+
+    .empty-out {
+      color: #333;
+      font-size: 13px;
+      padding: 3rem 0;
+      text-align: center;
+    }
+
+    .bottom-bar {
+      grid-column: 1 / -1;
+      padding: 10px 18px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      background: var(--bg);
+    }
+
+    .btn-run {
+      background: var(--accent);
+      color: #0f0f10;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 22px;
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    .btn-run:hover {
+      opacity: 0.85;
+    }
+
+    .btn-run:active {
+      transform: scale(0.97);
+    }
+
+    .btn-clear {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-family: var(--font-display);
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .btn-clear:hover {
+      background: var(--bg3);
+    }
+
+    .btn-ex {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 5px 11px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+
+    .btn-ex:hover {
+      border-color: var(--border2);
+      color: var(--text);
+      background: var(--bg3);
+    }
+
+    #status {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+      margin-left: auto;
+    }
+
+    /* Reference section */
+    .ref-section {
+      padding: 2rem;
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+    }
+
+    .ref-section h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-size: 11px;
+      margin-bottom: 1.25rem;
+    }
+
+    .ref-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1rem;
+    }
+
+    .ref-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    .ref-card h3 {
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      margin-bottom: 8px;
+    }
+
+    .ref-card pre {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.8;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .ref-card pre .kw {
+      color: var(--accent);
+    }
+
+    .ref-card pre .str {
+      color: var(--accent2);
+    }
+
+    .ref-card pre .num {
+      color: var(--accent4);
+    }
+
+    .ref-card pre .cm {
+      color: #444;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border2);
+      border-radius: 3px;
+    }
+  </style>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+
+<body>
+
+  <header>
+    <div>
+      <h1>LexLang</h1>
+      <p>Intérprete de lenguaje personalizado · v2.0</p>
+    </div>
+    <div class="tags-row">
+      <span class="tag t-kw">SUMA / RESTA</span>
+      <span class="tag t-str">CONCAT</span>
+      <span class="tag t-num">REPETICION</span>
+      <span class="tag t-fn">FUNCIONES</span>
+      <span class="tag t-ok">IF / ELSE / MIENTRAS</span>
+      <span class="tag t-err">VARIABLES</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="editor-pane">
+      <div class="pane-header">
+        <span><span class="dot" style="background:var(--accent)"></span>EDITOR</span>
+        <span style="font-size:10px">Ctrl+Enter para ejecutar</span>
+      </div>
+      <textarea id="code" spellcheck="false" placeholder="# Escribe tu código LexLang aquí..."></textarea>
+    </div>
+
+    <div class="output-pane">
+      <div class="pane-header">
+        <span><span class="dot" style="background:var(--accent2)"></span>SALIDA</span>
+        <button class="btn-clear" onclick="clearOutput()" style="padding:3px 10px;font-size:11px">Limpiar</button>
+      </div>
+      <div id="output">
+        <div class="empty-out">// La salida aparecerá aquí...</div>
+      </div>
+    </div>
+
+    <div class="debug-pane">
+      <div class="pane-header">
+    <div style="display:none"><div id="debug-out"></div></div>
+
+    <div class="bottom-bar">
+      <button class="btn-run" onclick="runCode()">&#9654; Ejecutar</button>
+      <button class="btn-clear" onclick="document.getElementById('code').value=''">Nuevo</button>
+      <span style="color:var(--muted);font-size:12px;font-family:var(--font-mono)">Ejemplos:</span>
+      <button class="btn-ex" onclick="loadEx('aritmetica')">Aritmética</button>
+      <button class="btn-ex" onclick="loadEx('variables')">Variables</button>
+      <button class="btn-ex" onclick="loadEx('cadenas')">Cadenas</button>
+      <button class="btn-ex" onclick="loadEx('if')">If / Else</button>
+      <button class="btn-ex" onclick="loadEx('mientras')">Mientras</button>
+      <button class="btn-ex" onclick="loadEx('funciones')">Funciones</button>
+      <button class="btn-ex" onclick="loadEx('completo')">Programa completo</button>
+      <span id="status"></span>
+    </div>
+  </main>
+
+  <!-- Panel de análisis full-width -->
+  <div class="analysis-section" id="analysis-section">
+    <div class="analysis-tabs">
+      <div class="analysis-tab active" onclick="switchTab('tokens')" id="tab-tokens">
+        &#9632; ANALIZADOR LÉXICO
+      </div>
+      <div class="analysis-tab" onclick="switchTab('ast')" id="tab-ast">
+        &#9670; ÁRBOL SINTÁCTICO
+      </div>
+      <div class="analysis-tab" onclick="switchTab('lark')" id="tab-lark">
+        &#9602; TEXTO LARK
+      </div>
+    </div>
+    <div class="analysis-panel active" id="panel-tokens">
+      <table class="token-table" id="token-table-body"></table>
+    </div>
+    <div class="analysis-panel" id="panel-ast">
+      <div id="tree-svg-container" style="min-height:200px;">// El árbol aparecerá aquí...</div>
+    </div>
+    <div class="analysis-panel" id="panel-lark">
+      <pre id="lark-text" style="font-family:var(--font-mono); font-size:12px; color:var(--muted); white-space:pre-wrap;"></pre>
+    </div>
+  </div>
+
+  <div class="ref-section">
+    <h2>Referencia del lenguaje</h2>
+    <div class="ref-grid">
+
+      <div class="ref-card">
+        <h3 style="color:var(--accent)">Variables y tipos</h3>
+        <pre><span class="kw">var</span> x = <span class="num">10</span>
+<span class="kw">var</span> nombre = <span class="str">"Hola"</span>
+<span class="kw">var</span> activo = <span class="kw">verdadero</span>
+<span class="kw">var</span> lista = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]</pre>
+      </div>
+
+      <div class="ref-card">
+        <h3 style="color:var(--accent4)">Aritmética (notación postfija)</h3>
+        <pre><span class="num">5 2</span> +        <span class="cm"># 7</span>
+<span class="num">9 3</span> -        <span class="cm"># 6</span>
+<span class="num">4 3</span> *        <span class="cm"># 12</span>
+<span class="num">10 2</span> /       <span class="cm"># 5</span>
+<span class="num">10 3</span> %       <span class="cm"># 1 (módulo)</span>
+<span class="num">2 8</span> ^        <span class="cm"># 256 (potencia)</span></pre>
+      </div>
+
+      <div class="ref-card">
+        <h3 style="color:var(--accent2)">Cadenas</h3>
+        <pre><span class="kw">var</span> s = <span class="str">"Hola"</span>
+<span class="num">3</span>*<span class="str">"ja"</span>         <span class="cm"># jajaja</span>
+A=<span class="str">"Hola"</span> B=<span class="str">" Mundo"</span> :: AB
+longitud(<span class="str">"abc"</span>)  <span class="cm"># 3</span>
+mayusculas(<span class="str">"hola"</span>)
+minusculas(<span class="str">"HOLA"</span>)</pre>
+      </div>
+
+      <div class="ref-card">
+        <h3 style="color:var(--accent6)">Condicionales</h3>
+        <pre><span class="kw">si</span> (x > <span class="num">5</span>) {
+  impr(<span class="str">"mayor"</span>)
+} <span class="kw">sino si</span> (x == <span class="num">5</span>) {
+  impr(<span class="str">"igual"</span>)
+} <span class="kw">sino</span> {
+  impr(<span class="str">"menor"</span>)
+}</pre>
+      </div>
+
+      <div class="ref-card">
+        <h3 style="color:var(--accent6)">Bucle mientras</h3>
+        <pre><span class="kw">var</span> i = <span class="num">0</span>
+<span class="kw">mientras</span> (i < <span class="num">5</span>) {
+  impr(i)
+  i = i <span class="num">1</span> +
+}</pre>
+      </div>
+
+      <div class="ref-card">
+        <h3 style="color:var(--accent6)">Bucle repetir</h3>
+        <pre><span class="kw">repetir</span> <span class="num">3</span> {
+  impr(<span class="str">"Hola"</span>)
+}</pre>
+      </div>
+
+      <div class="ref-card">
+        <h3 style="color:var(--accent5)">Funciones</h3>
+        <pre><span class="kw">funcion</span> suma(a, b) {
+  retornar a b +
+}
+<span class="kw">var</span> r = suma(<span class="num">3</span>, <span class="num">4</span>)
+impr(r)   <span class="cm"># 7</span></pre>
+      </div>
+
+      <div class="ref-card">
+        <h3 style="color:var(--accent5)">Funciones matemáticas</h3>
+        <pre>raiz(<span class="num">16</span>)      <span class="cm"># 4</span>
+abs(<span class="num">-5</span>)       <span class="cm"># 5</span>
+redondear(<span class="num">3.7</span>) <span class="cm"># 4</span>
+piso(<span class="num">3.9</span>)     <span class="cm"># 3</span>
+techo(<span class="num">3.1</span>)    <span class="cm"># 4</span>
+max(<span class="num">3</span>, <span class="num">7</span>)     <span class="cm"># 7</span>
+min(<span class="num">3</span>, <span class="num">7</span>)     <span class="cm"># 3</span></pre>
+      </div>
+
+      <div class="ref-card">
+        <h3 style="color:var(--accent3)">Listas</h3>
+        <pre><span class="kw">var</span> nums = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]
+agregar(nums, <span class="num">4</span>)
+longitud(nums)  <span class="cm"># 4</span>
+elemento(nums, <span class="num">0</span>) <span class="cm"># 1</span></pre>
+      </div>
+
+      <div class="ref-card">
+        <h3 style="color:var(--accent)">Impresión</h3>
+        <pre>impr(<span class="str">"Hola mundo"</span>)
+impr(<span class="num">5 3</span> +)
+impr(nombre)
+impr(<span class="str">"Resultado:"</span>, x)</pre>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    //  LEXLANG INTERPRETER v2.0
+    // ============================================================
+
+    const EXAMPLES = {
+      aritmetica: `# Operaciones aritméticas (notación postfija)
+5 2 +
+9 3 -
+4 3 *
+10 2 /
+10 3 %
+2 8 ^
+impr("Suma de 5+2:")
+impr(5 2 +)
+impr("Potencia 2^10:")
+impr(2 10 ^)`,
+
+      variables: `# Variables y asignación
+var x = 10
+var y = 3
+var nombre = "LexLang"
+var activo = verdadero
+impr(x)
+impr(nombre)
+impr(activo)
+x = x y +
+impr(x)`,
+
+      cadenas: `# Operaciones con cadenas
+var s = "Hola"
+impr(longitud(s))
+impr(mayusculas(s))
+impr(minusculas("MUNDO"))
+3*"ja"
+impr(3*"je")
+A="Soy " B="feliz " C="hoy" :: ABC
+impr(A="Lex" B="Lang" :: AB)`,
+
+      if: `# Condicionales if / sino si / sino
+var edad = 20
+si (edad >= 18) {
+  impr("Mayor de edad")
+} sino {
+  impr("Menor de edad")
+}
+
+var nota = 75
+si (nota >= 90) {
+  impr("Excelente")
+} sino si (nota >= 70) {
+  impr("Bueno")
+} sino si (nota >= 50) {
+  impr("Regular")
+} sino {
+  impr("Reprobado")
+}`,
+
+      mientras: `# Bucle mientras
+var i = 1
+mientras (i <= 5) {
+  impr(i)
+  i = i 1 +
+}
+
+# Bucle repetir
+repetir 4 {
+  impr("Iterando...")
+}
+
+# Suma acumulada
+var suma = 0
+var n = 1
+mientras (n <= 10) {
+  suma = suma n +
+  n = n 1 +
+}
+impr("Suma 1 al 10:")
+impr(suma)`,
+
+      funciones: `# Definición y llamada de funciones
+funcion saludo(nombre) {
+  impr("Hola,")
+  impr(nombre)
+}
+
+funcion potencia(base, exp) {
+  retornar base exp ^
+}
+
+funcion factorial(n) {
+  si (n <= 1) {
+    retornar 1
+  }
+  retornar n factorial(n 1 -) *
+}
+
+saludo("Mundo")
+var r = potencia(2, 8)
+impr("2^8 =")
+impr(r)
+impr("5! =")
+impr(factorial(5))`,
+
+      completo: `# Programa completo en LexLang
+var version = "2.0"
+impr("LexLang v")
+impr(version)
+
+# Variables numéricas
+var a = 15
+var b = 4
+
+impr("--- Aritmética ---")
+impr(a b +)
+impr(a b -)
+impr(a b *)
+impr(a b /)
+impr(a b %)
+
+impr("--- Cadenas ---")
+var saludo = "Hola"
+var mundo = " Mundo"
+A="Bienvenido " B="a " C="LexLang" :: ABC
+impr(mayusculas("lexlang"))
+impr(3*"ha")
+
+impr("--- Condicional ---")
+si (a > b) {
+  impr("a es mayor que b")
+} sino {
+  impr("b es mayor o igual")
+}
+
+impr("--- Bucle ---")
+var cont = 1
+mientras (cont <= 5) {
+  impr(cont)
+  cont = cont 1 +
+}
+
+impr("--- Función ---")
+funcion cuadrado(x) {
+  retornar x x *
+}
+impr(cuadrado(7))
+impr(cuadrado(12))`
+    };
+
+    // Javascript Lexer, Parser and Interpreter logic removed in favor of Python backend.
+
+    // ---- UI ----
+    const opStyle = {
+      SUMA: { cls: 'suma', bg: 'rgba(74,159,240,0.18)', color: '#4a9ff0' },
+      RESTA: { cls: 'rest', bg: 'rgba(74,240,200,0.18)', color: '#4af0c8' },
+      MULTIPLICAR: { cls: 'mul', bg: 'rgba(200,240,74,0.18)', color: '#c8f04a' },
+      DIVIDIR: { cls: 'div', bg: 'rgba(200,240,74,0.18)', color: '#c8f04a' },
+      MODULO: { cls: 'mod', bg: 'rgba(200,240,74,0.18)', color: '#c8f04a' },
+      POTENCIA: { cls: 'pow', bg: 'rgba(200,240,74,0.18)', color: '#c8f04a' },
+      REPETICION: { cls: 'rep', bg: 'rgba(240,168,74,0.18)', color: '#f0a84a' },
+      CONCAT: { cls: 'cat', bg: 'rgba(138,74,240,0.18)', color: '#8a4af0' },
+      IMPRIMIR: { cls: 'prt', bg: 'rgba(240,74,138,0.18)', color: '#f04a8a' },
+      VARIABLE: { cls: 'var', bg: 'rgba(74,240,200,0.18)', color: '#4af0c8' },
+      ASIGNAR: { cls: 'asn', bg: 'rgba(74,240,200,0.18)', color: '#4af0c8' },
+      FUNCION: { cls: 'fun', bg: 'rgba(138,74,240,0.18)', color: '#8a4af0' },
+      LLAMADA: { cls: 'cal', bg: 'rgba(138,74,240,0.18)', color: '#8a4af0' },
+      RESULTADO: { cls: 'res', bg: 'rgba(136,133,128,0.18)', color: '#888580' },
+      ERROR: { cls: 'err', bg: 'rgba(240,74,138,0.25)', color: '#f04a8a' },
+    };
+
+    function valClass(v) {
+      if (typeof v === 'number') return 'is-num';
+      if (typeof v === 'boolean') return 'is-bool';
+      if (v === null) return 'is-info';
+      if (typeof v === 'string' && v.startsWith('Error')) return 'is-err';
+      return 'is-str';
+    }
+
+    let lineCount = 0;
+
+    async function runCode() {
+      let code = document.getElementById('code').value;
+      const out = document.getElementById('output');
+      const status = document.getElementById('status');
+      const debugOut = document.getElementById('debug-out');
+
+      status.textContent = 'Ejecutando en el servidor...';
+      status.style.color = 'var(--muted)';
+
+      if (code.trim().length > 0 && !code.trim().endsWith('$')) {
+          code += '\n$';
+      }
+
+      try {
+        const response = await fetch('/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+
+        if (!response.ok) throw new Error('Error al conectar con el servidor de Python');
+
+        const payload = await response.json();
+        const results = payload.operations || payload;
+
+        if (!results || results.length === 0) {
+          out.innerHTML = '<div class="empty-out">// Sin salida</div>';
+          status.textContent = '';
+          return;
+        }
+
+        // --- Populate full-width analysis panel ---
+        const analysisSection = document.getElementById('analysis-section');
+        analysisSection.classList.add('visible');
+
+        // Tokens tab
+        const tokenTable = document.getElementById('token-table-body');
+        if (payload.tokens && payload.tokens.length) {
+            let rows = `<tr><th>Línea</th><th>Tipo</th><th>Valor</th></tr>`;
+            for (const t of payload.tokens) {
+                rows += `<tr>
+                    <td class="tok-line">${t.line}</td>
+                    <td class="tok-type">${t.type}</td>
+                    <td class="tok-val">${escHtml(String(t.value))}</td>
+                </tr>`;
+            }
+            tokenTable.innerHTML = rows;
+        } else {
+            tokenTable.innerHTML = '<tr><td colspan="3" style="color:var(--muted);padding:12px">Sin tokens</td></tr>';
+        }
+
+        // AST tree tab
+        const treeContainer = document.getElementById('tree-svg-container');
+        treeContainer.innerHTML = '';
+        if (payload.tree_json && Object.keys(payload.tree_json).length) {
+            renderD3Tree(payload.tree_json, treeContainer);
+        } else {
+            treeContainer.textContent = '// Sin árbol disponible';
+        }
+
+        // Lark text tab
+        document.getElementById('lark-text').textContent = payload.tree || '';
+
+
+        lineCount = 0;
+        let html = '';
+        let errors = 0;
+
+        for (const r of results) {
+          lineCount++;
+          // results from Python use the structured format: { op, display, raw, color }
+          const opKey = r.op || 'RESULTADO';
+          const isError = opKey === 'ERROR';
+          const style = opStyle[opKey] || opStyle['RESULTADO'];
+
+          // valClass logic
+          let vc = 'is-str';
+          if (isError) vc = 'is-err';
+          else if (typeof r.raw === 'number') vc = 'is-num';
+          else if (typeof r.raw === 'boolean') vc = 'is-bool';
+          else if (r.raw === null) vc = 'is-info';
+
+          html += `<div class="out-line">
+        <span class="out-line-num">${lineCount}</span>
+        <span class="out-op" style="background:${style.bg};color:${style.color}">${opKey}</span>
+        <span class="out-val ${vc}">${escHtml(String(r.display))}</span>
+      </div>`;
+          if (isError) errors++;
+        }
+
+        out.innerHTML = html;
+        out.scrollTop = out.scrollHeight;
+        status.textContent = `${results.length} instrucción(es) de Python · ${errors > 0 ? errors + ' error(es)' : 'sin errores'}`;
+        status.style.color = errors > 0 ? '#f04a8a' : '#888580';
+
+      } catch (e) {
+        out.innerHTML = `<div class="out-line">
+      <span class="out-op" style="background:rgba(240,74,138,0.25);color:#f04a8a">ERROR</span>
+      <span class="out-val is-err">${escHtml(e.message)}</span>
+    </div>`;
+        status.textContent = 'Error de conexión';
+        status.style.color = '#f04a8a';
+      }
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function switchTab(tab) {
+      ['tokens', 'ast', 'lark'].forEach(t => {
+        document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+        document.getElementById('panel-' + t).classList.toggle('active', t === tab);
+      });
+    }
+
+    function renderD3Tree(data, container) {
+      const nodeW = 80, nodeH = 28, marginX = 20, marginY = 50;
+
+      const root = d3.hierarchy(data);
+      const treeLayout = d3.tree().nodeSize([nodeW + marginX, nodeH + marginY]);
+      treeLayout(root);
+
+      let x0 = Infinity, x1 = -Infinity;
+      root.each(d => { if (d.x < x0) x0 = d.x; if (d.x > x1) x1 = d.x; });
+      let y0 = 0, y1 = -Infinity;
+      root.each(d => { if (d.y > y1) y1 = d.y; });
+
+      const W = (x1 - x0) + nodeW + marginX * 2;
+      const H = y1 + nodeH + marginY * 2;
+      const offsetX = -x0 + nodeW / 2 + marginX;
+      const offsetY = marginY;
+
+      const svg = d3.create('svg')
+        .attr('width', W)
+        .attr('height', H)
+        .style('font-family', 'JetBrains Mono, monospace')
+        .style('font-size', '11px');
+
+      // Links
+      svg.append('g')
+        .attr('fill', 'none')
+        .attr('stroke', '#555')
+        .attr('stroke-width', 1.5)
+        .selectAll('path')
+        .data(root.links())
+        .join('path')
+        .attr('d', d3.linkVertical()
+          .x(d => d.x + offsetX)
+          .y(d => d.y + offsetY));
+
+      // Nodes
+      const node = svg.append('g')
+        .selectAll('g')
+        .data(root.descendants())
+        .join('g')
+        .attr('transform', d => `translate(${d.x + offsetX}, ${d.y + offsetY})`);
+
+      node.append('rect')
+        .attr('x', -nodeW / 2)
+        .attr('y', -nodeH / 2)
+        .attr('width', nodeW)
+        .attr('height', nodeH)
+        .attr('rx', 3)
+        .attr('fill', '#f0f4ff')
+        .attr('stroke', '#3050c8')
+        .attr('stroke-width', 1.5);
+
+      node.append('text')
+        .attr('dy', '0.35em')
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#1a30a0')
+        .attr('font-weight', '600')
+        .text(d => {
+          const name = d.data.name;
+          return name.length > 9 ? name.slice(0, 8) + '…' : name;
+        })
+        .append('title').text(d => d.data.name);
+
+      container.appendChild(svg.node());
+    }
+
+    function clearOutput() {
+      document.getElementById('output').innerHTML = '<div class="empty-out">// La salida aparecerá aquí...</div>';
+      document.getElementById('status').textContent = '';
+    }
+
+    function loadEx(key) {
+      document.getElementById('code').value = EXAMPLES[key] || '';
+    }
+
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); runCode(); }
+    });
+  </script>
+
+</body>
+
+</html>

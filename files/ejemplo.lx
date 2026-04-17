@@ -1,0 +1,57 @@
+# ============================================
+#  PROGRAMA DE PRUEBA — LexLang v2.0
+# ============================================
+
+# Variables
+var nombre = "LexLang"
+var version = 2
+
+# Aritmetica (notacion postfija)
+impr(5 2 +)
+impr(9 3 -)
+impr(4 3 *)
+impr(10 2 /)
+impr(2 8 ^)
+
+# Cadenas
+impr(3*"ha")
+A="Hola " B="desde " C="LexLang" :: ABC
+impr(mayusculas("lexlang"))
+
+# Condicional
+var nota = 85
+si (nota >= 90) {
+  impr("Excelente")
+} sino si (nota >= 70) {
+  impr("Bueno")
+} sino {
+  impr("Regular")
+}
+
+# Bucle mientras
+var i = 1
+mientras (i <= 5) {
+  impr(i)
+  i = i 1 +
+}
+
+# Bucle repetir
+repetir 3 {
+  impr("Iterando...")
+}
+
+# Funcion
+funcion factorial(n) {
+  si (n <= 1) {
+    retornar 1
+  }
+  retornar n factorial(n 1 -) *
+}
+
+impr(factorial(5))
+impr(factorial(10))
+
+# Funciones matematicas
+impr(raiz(16))
+impr(abs(-42))
+impr(max(10, 25))
